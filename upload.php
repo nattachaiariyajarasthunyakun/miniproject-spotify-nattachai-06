@@ -10,6 +10,7 @@ $artistStatement = mysqli_prepare($conn, $artistSql);
 mysqli_stmt_bind_param($artistStatement, 's', $artistId);
 mysqli_stmt_execute($artistStatement);
 $artists = mysqli_stmt_get_result($artistStatement);
+$artist = mysqli_fetch_assoc($artists);
 
 $albumSql = 'SELECT albums_id, albums_name FROM albums WHERE artist_id = ? ORDER BY albums_name';
 $albumStatement = mysqli_prepare($conn, $albumSql);
@@ -19,52 +20,70 @@ $albums = mysqli_stmt_get_result($albumStatement);
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $title = trim($_POST['title']);
-    $selectedArtistId = $_POST['artist'];
-    $albumId = $_POST['album'];
-    $song = $_FILES['song'];
+    $title = trim($_POST['title'] ?? '');
+    $albumId = $_POST['album'] ?? '';
+    $song = $_FILES['song'] ?? null;
 
-    if ($title == '' || $selectedArtistId != $artistId || $albumId == '' || $song['error'] != UPLOAD_ERR_OK) {
+    if ($title == '' || $albumId == '' || !$song) {
         $message = 'Please complete every field.';
+    } elseif ($song['error'] != UPLOAD_ERR_OK) {
+        $uploadErrors = [
+            UPLOAD_ERR_INI_SIZE => 'The MP3 is larger than the server upload limit.',
+            UPLOAD_ERR_FORM_SIZE => 'The MP3 is too large.',
+            UPLOAD_ERR_PARTIAL => 'The MP3 was only partly uploaded. Please try again.',
+            UPLOAD_ERR_NO_FILE => 'Please choose an MP3 file.',
+        ];
+        $message = $uploadErrors[$song['error']] ?? 'The MP3 upload failed. Please try again.';
     } elseif (strtolower(pathinfo($song['name'], PATHINFO_EXTENSION)) != 'mp3') {
         $message = 'Please choose an MP3 audio file.';
     } else {
-        $folder = __DIR__ . '/songs';
+        // Use the project's existing folder for uploaded MP3 files.
+        $folder = __DIR__ . '/song';
 
-        if (!is_dir($folder)) {
-            mkdir($folder, 0755, true);
-        }
-
-        $filename = uniqid('song_') . '.mp3';
-        $filePath = 'songs/' . $filename;
-
-        if (move_uploaded_file($song['tmp_name'], $folder . '/' . $filename)) {
-            // Your SQL file does not make song_id auto-increment, so make the next ID.
-            $idResult = mysqli_query($conn, 'SELECT MAX(song_id) + 1 AS next_id FROM songs');
-            $idRow = mysqli_fetch_assoc($idResult);
-            $songId = $idRow['next_id'] ?? 1;
-            $duration = 0;
-
-            $sql = 'INSERT INTO songs (song_id, title, artist, albums, file_path, duration)
-                    VALUES (?, ?, ?, ?, ?, ?)';
-            $statement = mysqli_prepare($conn, $sql);
-            mysqli_stmt_bind_param($statement, 'issssi', $songId, $title, $selectedArtistId, $albumId, $filePath, $duration);
-
-            if (mysqli_stmt_execute($statement)) {
-                header('Location: index.php');
-                exit;
-            }
-
-            unlink($folder . '/' . $filename);
-            $message = 'The song could not be saved to the database.';
+        if (!is_dir($folder) && !mkdir($folder, 0777, true)) {
+            $message = 'The song folder could not be created.';
+        } elseif (!is_writable($folder)) {
+            $message = 'The song folder is not writable. Check the folder permissions.';
         } else {
-            $message = 'The file could not be uploaded. Please try again.';
+            $filename = uniqid('song_') . '.mp3';
+            $filePath = 'song/' . $filename;
+            $destination = $folder . '/' . $filename;
+
+            // Make sure the chosen album belongs to this logged-in artist.
+            $checkAlbum = mysqli_prepare($conn, 'SELECT albums_id FROM albums WHERE albums_id = ? AND artist_id = ?');
+            mysqli_stmt_bind_param($checkAlbum, 'ss', $albumId, $artistId);
+            mysqli_stmt_execute($checkAlbum);
+
+            if (mysqli_num_rows(mysqli_stmt_get_result($checkAlbum)) == 0) {
+            $message = 'Please choose one of your own albums.';
+            } elseif (move_uploaded_file($song['tmp_name'], $destination)) {
+                // Your SQL file does not make song_id auto-increment, so make the next ID.
+                $idResult = mysqli_query($conn, 'SELECT COALESCE(MAX(song_id), 0) + 1 AS next_id FROM songs');
+                $idRow = mysqli_fetch_assoc($idResult);
+                $songId = $idRow['next_id'];
+                $duration = 0;
+
+                $sql = 'INSERT INTO songs (song_id, title, artist, albums, file_path, duration)
+                        VALUES (?, ?, ?, ?, ?, ?)';
+                $statement = mysqli_prepare($conn, $sql);
+                mysqli_stmt_bind_param($statement, 'issssi', $songId, $title, $artistId, $albumId, $filePath, $duration);
+
+                if (mysqli_stmt_execute($statement)) {
+                    header('Location: index.php');
+                    exit;
+                }
+
+                unlink($destination);
+                $message = 'Database error: ' . mysqli_stmt_error($statement);
+            } else {
+                $message = 'The MP3 could not be moved into the song folder.';
+            }
         }
     }
 }
 
 $pagePath = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
-$cssFile = ($pagePath ? $pagePath : '') . '/style.css?v=4';
+$cssFile = ($pagePath ? $pagePath : '') . '/style.css?v=5';
 ?>
 
 <!DOCTYPE html>
@@ -83,28 +102,20 @@ $cssFile = ($pagePath ? $pagePath : '') . '/style.css?v=4';
             <a class="back-link" href="index.php">← Back to library</a>
             <p class="green-text">BUILD YOUR COLLECTION</p>
             <h1>Add a new song</h1>
-            <p class="muted">Choose an artist and album from your database.</p>
+            <p class="muted">Upload music as <?= htmlspecialchars($artist['artist_name'] ?? 'your artist account') ?>.</p>
+            <a class="button small-button add-album-link" href="add_album.php">+ Create album</a>
 
             <?php if ($message != '') { ?>
                 <p class="error"><?= htmlspecialchars($message) ?></p>
             <?php } ?>
 
-            <?php if (mysqli_num_rows($artists) == 0 || mysqli_num_rows($albums) == 0) { ?>
-                <p class="error">Add at least one artist and album in phpMyAdmin before uploading a song.</p>
+            <?php if (!$artist || mysqli_num_rows($albums) == 0) { ?>
+                <p class="error">You need an album before you can upload a song.</p>
+                <a class="button" href="add_album.php">Create my first album</a>
             <?php } else { ?>
                 <form method="POST" enctype="multipart/form-data">
                     <label>Song title</label>
                     <input type="text" name="title" placeholder="e.g. Midnight Drive" required>
-
-                    <label>Artist</label>
-                    <select name="artist" required>
-                        <option value="">Choose an artist</option>
-                        <?php while ($artist = mysqli_fetch_assoc($artists)) { ?>
-                            <option value="<?= htmlspecialchars($artist['artist_id']) ?>">
-                                <?= htmlspecialchars($artist['artist_name']) ?>
-                            </option>
-                        <?php } ?>
-                    </select>
 
                     <label>Album</label>
                     <select name="album" required>

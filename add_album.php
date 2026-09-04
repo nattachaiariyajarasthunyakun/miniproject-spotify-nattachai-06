@@ -38,7 +38,7 @@ mysqli_stmt_execute($albumStatement);
 $albums = mysqli_stmt_get_result($albumStatement);
 
 $pagePath = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
-$cssFile = ($pagePath ? $pagePath : '') . '/style.css?v=4';
+$cssFile = ($pagePath ? $pagePath : '') . '/style.css?v=5';
 ?>
 <!DOCTYPE html>
 <html lang="en">

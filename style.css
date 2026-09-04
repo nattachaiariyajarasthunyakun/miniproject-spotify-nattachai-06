@@ -22,10 +22,11 @@ body {
 .sidebar {
     position: fixed;
     top: 0;
-    bottom: 0;
+    bottom: 90px;
     width: 250px;
     padding: 28px 18px;
     background: var(--black);
+    overflow-y: auto;
 }
 
 .logo {
@@ -135,6 +136,10 @@ header {
     font-size: 12px;
 }
 
+.add-album-link {
+    margin-top: 18px;
+}
+
 .outline-button {
     border: 1px solid #777;
     background: transparent;
@@ -200,14 +205,101 @@ h1 em {
     margin-top: 28px;
 }
 
+body {
+    padding-bottom: 90px;
+}
+
 .song {
     display: grid;
-    grid-template-columns: 30px 1.5fr 1fr 220px 65px;
+    grid-template-columns: 30px 1.5fr 1fr 70px 110px;
     align-items: center;
     gap: 16px;
     min-height: 62px;
     padding: 8px 12px;
     border-radius: 5px;
+    overflow: hidden;
+}
+
+.song > * {
+    min-width: 0;
+}
+
+.number {
+    position: relative;
+    display: grid;
+    place-items: center;
+    color: var(--gray);
+}
+
+.track-number {
+    display: block;
+    font-size: 14px;
+}
+
+.row-play-btn {
+    display: none;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: white;
+    cursor: pointer;
+    place-items: center;
+    transition: transform 0.1s ease;
+}
+
+.row-play-btn:hover {
+    transform: scale(1.12);
+}
+
+.row-play-btn svg {
+    width: 13px;
+    height: 13px;
+    fill: white;
+}
+
+/* Deterministic icon toggle: driven by a class on the button itself,
+   not the browser's `hidden` attribute (which is easy to accidentally override). */
+.row-play-btn .icon-pause,
+.play-main .icon-pause {
+    display: none;
+}
+
+.row-play-btn.is-playing .icon-play,
+.play-main.is-playing .icon-play {
+    display: none;
+}
+
+.row-play-btn.is-playing .icon-pause,
+.play-main.is-playing .icon-pause {
+    display: block;
+}
+
+.row-play-btn.is-playing .icon-pause {
+    fill: var(--green);
+}
+
+.song-row:hover .track-number,
+.song-row.is-playing .track-number {
+    display: none;
+}
+
+.song-row:hover .row-play-btn,
+.song-row.is-playing .row-play-btn {
+    display: grid;
+}
+
+.song-row.is-playing strong {
+    color: var(--green);
+}
+
+.row-duration {
+    color: var(--gray);
+    font-size: 13px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
 .header-row {
@@ -237,6 +329,86 @@ h1 em {
     display: flex;
     align-items: center;
     gap: 13px;
+    min-width: 0;
+}
+
+.song-title-text {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+.edit-toggle-btn {
+    border: 0;
+    background: transparent;
+    color: var(--gray);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.edit-toggle-btn:hover {
+    color: white;
+}
+
+/* ---- Edit song modal ---- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 200;
+}
+
+.modal-overlay[hidden] {
+    display: none;
+}
+
+.modal-box {
+    width: 100%;
+    max-width: 380px;
+    padding: 26px;
+    border-radius: 10px;
+    background: var(--card);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.modal-box h3 {
+    margin: 0 0 16px;
+    font-size: 18px;
+}
+
+.modal-box form {
+    display: grid;
+    gap: 14px;
+}
+
+.modal-box input[type="text"] {
+    padding: 12px;
+    border: 1px solid #565656;
+    border-radius: 6px;
+    background: #2a2a2a;
+    color: white;
+    font-size: 14px;
+}
+
+.modal-box input[type="text"]:focus {
+    border-color: var(--green);
+    outline: none;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 .cover {
@@ -411,6 +583,207 @@ audio {
     color: var(--green);
 }
 
+/* ---- Bottom player bar (like the Spotify desktop app) ---- */
+.player-bar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: 1fr minmax(300px, 2fr) 1fr;
+    align-items: center;
+    gap: 20px;
+    height: 90px;
+    padding: 0 18px;
+    background: var(--black);
+    border-top: 1px solid #282828;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.35);
+    z-index: 50;
+}
+
+.player-now-playing {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.player-cover {
+    display: grid;
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--green), #168640);
+    color: #063617;
+    font-size: 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.player-track-info {
+    min-width: 0;
+}
+
+.player-track-info strong {
+    display: block;
+    overflow: hidden;
+    font-size: 14px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.player-track-info small {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--gray);
+    font-size: 12px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.player-center {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.player-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.control-btn {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--gray);
+    cursor: pointer;
+    place-items: center;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.control-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: var(--gray);
+    transition: fill 0.15s ease;
+}
+
+.control-btn:hover {
+    background: #2a2a2a;
+    transform: scale(1.06);
+}
+
+.control-btn:hover svg {
+    fill: white;
+}
+
+.play-main {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: white;
+    place-items: center;
+}
+
+.play-main:hover {
+    background: #f0f0f0;
+    transform: scale(1.08);
+}
+
+.play-main svg {
+    width: 14px;
+    height: 14px;
+    fill: black;
+}
+
+.play-main:hover svg {
+    fill: black;
+}
+
+.player-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 560px;
+}
+
+.time {
+    min-width: 34px;
+    color: var(--gray);
+    font-size: 11px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Custom slider look: thin flat track, thumb only shows on hover/drag */
+#seek-bar,
+#volume-bar {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--green) 0%, var(--green) var(--fill, 0%), #4d4d4d var(--fill, 0%), #4d4d4d 100%);
+    outline: none;
+    cursor: pointer;
+}
+
+#seek-bar::-webkit-slider-thumb,
+#volume-bar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+
+#seek-bar::-moz-range-thumb,
+#volume-bar::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 0;
+    border-radius: 50%;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+
+.player-progress:hover #seek-bar::-webkit-slider-thumb,
+.player-volume:hover #volume-bar::-webkit-slider-thumb {
+    opacity: 1;
+}
+
+.player-progress:hover #seek-bar::-moz-range-thumb,
+.player-volume:hover #volume-bar::-moz-range-thumb {
+    opacity: 1;
+}
+
+.player-volume {
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    gap: 10px;
+    width: 140px;
+}
+
+.player-volume span {
+    font-size: 14px;
+    color: var(--gray);
+}
+
 @media (max-width: 760px) {
     .sidebar {
         display: none;
@@ -437,15 +810,39 @@ audio {
     }
 
     .song {
-        grid-template-columns: 25px 1fr 90px 55px;
+        grid-template-columns: 22px 1fr 85px;
     }
 
-    .song audio {
-        grid-column: 2 / 5;
-        width: 100%;
+    .row-duration,
+    .artist {
+        display: none;
+    }
+
+    .row-actions {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
     }
 
     .header-row {
         display: none;
+    }
+
+    .modal-overlay {
+        padding: 20px;
+    }
+
+    .player-bar {
+        grid-template-columns: 1fr auto;
+        height: 70px;
+    }
+
+    .player-center .player-progress,
+    .player-volume {
+        display: none;
+    }
+
+    .player-now-playing {
+        overflow: hidden;
     }
 }
